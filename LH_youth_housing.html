@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LH 청년 매입임대 지도</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Apple SD Gothic Neo', sans-serif; background: #f8f8f7; }
+#header { padding: 14px 20px; background: #fff; border-bottom: 1px solid #e8e8e6; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+#header h1 { font-size: 16px; font-weight: 600; color: #1a1a1a; }
+#count { font-size: 13px; color: #888; }
+#gu-filter { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 20px; background: #fff; border-bottom: 1px solid #e8e8e6; }
+.chip { font-size: 12px; padding: 4px 12px; border-radius: 99px; border: 1px solid #ddd; color: #555; background: #fff; cursor: pointer; transition: all 0.15s; }
+.chip:hover { border-color: #185FA5; color: #185FA5; }
+.chip.on { background: #E6F1FB; color: #0C447C; border-color: #85B7EB; font-weight: 500; }
+#map { width: 100%; height: calc(100vh - 105px); }
+.popup-box { font-family: 'Apple SD Gothic Neo', sans-serif; min-width: 210px; }
+.popup-no { font-size: 11px; color: #185FA5; font-weight: 600; margin-bottom: 3px; }
+.popup-name { font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
+.popup-addr { font-size: 12px; color: #666; line-height: 1.5; margin-bottom: 8px; }
+.popup-divider { border: none; border-top: 1px solid #eee; margin: 6px 0; }
+.popup-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.popup-tag { font-size: 11px; padding: 3px 8px; border-radius: 99px; background: #f0f0ef; color: #444; }
+.popup-tag.elev-y { background: #E1F5EE; color: #085041; }
+.popup-tag.elev-n { background: #FCEBEB; color: #791F1F; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>LH 청년 매입임대주택</h1>
+  <span id="count">25개 표시 중</span>
+</div>
+<div id="gu-filter"></div>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const houses = [
+  {no:59,  name:"구로개봉동(오성드림빌)",     addr:"서울특별시 구로구 경인로35길 16-8(개봉동)",      gu:"구로구",   lat:37.4913, lng:126.8547, area:58.84, rooms:3, floor:"3층",  elev:"N"},
+  {no:269, name:"성북장위동(시온아트빌)",     addr:"서울특별시 성북구 장위로15길 55-2(장위동)",     gu:"성북구",   lat:37.6127, lng:127.0528, area:50.08, rooms:2, floor:"4층",  elev:"Y"},
+  {no:27,  name:"강북수유동(성우울타리)",     addr:"서울특별시 강북구 노해로33길 60-9(수유동)",     gu:"강북구",   lat:37.6467, lng:127.0213, area:49.04, rooms:2, floor:"4층",  elev:"Y"},
+  {no:333, name:"은평역촌동(서경) 601",       addr:"서울특별시 은평구 연서로16길 3-7(역촌동)",      gu:"은평구",   lat:37.6098, lng:126.9196, area:47.99, rooms:3, floor:"6층",  elev:"Y"},
+  {no:25,  name:"강북번동(리치하우스)",       addr:"서울특별시 강북구 덕릉로40길 55(번동)",         gu:"강북구",   lat:37.6365, lng:127.0341, area:47.42, rooms:3, floor:"3층",  elev:"Y"},
+  {no:16,  name:"강동성내동(주함해븐빌)",     addr:"서울특별시 강동구 양재대로97길 17(성내동)",     gu:"강동구",   lat:37.5384, lng:127.1243, area:45.99, rooms:3, floor:"4층",  elev:"Y"},
+  {no:268, name:"성북장위동(시온아트빌) 201", addr:"서울특별시 성북구 장위로15길 55-2(장위동)",     gu:"성북구",   lat:37.6130, lng:127.0531, area:43.77, rooms:3, floor:"2층",  elev:"Y"},
+  {no:175, name:"동작상도동",                 addr:"서울특별시 동작구 성대로17길 3(상도동)",        gu:"동작구",   lat:37.4968, lng:126.9474, area:42.81, rooms:1, floor:"4층",  elev:"N"},
+  {no:57,  name:"구로개봉동(오성드림) A-202", addr:"서울특별시 구로구 개봉로1길 106(개봉동)",       gu:"구로구",   lat:37.4931, lng:126.8573, area:41.49, rooms:2, floor:"2층",  elev:"Y"},
+  {no:58,  name:"구로개봉동(오성드림) A-302", addr:"서울특별시 구로구 개봉로1길 106(개봉동)",       gu:"구로구",   lat:37.4934, lng:126.8576, area:41.49, rooms:2, floor:"3층",  elev:"Y"},
+  {no:76,  name:"노원상계동(해밀)",           addr:"서울특별시 노원구 동일로237나길 17(상계동)",    gu:"노원구",   lat:37.6577, lng:127.0641, area:40.56, rooms:1, floor:"3층",  elev:"Y"},
+  {no:63,  name:"구로오류동(도양라비앙) 401", addr:"서울특별시 구로구 경인로 230-14(오류동)",       gu:"구로구",   lat:37.4992, lng:126.8438, area:40.13, rooms:2, floor:"4층",  elev:"Y"},
+  {no:65,  name:"구로오류동(도양라비앙) 701", addr:"서울특별시 구로구 경인로 230-14(오류동)",       gu:"구로구",   lat:37.4993, lng:126.8440, area:40.13, rooms:2, floor:"7층",  elev:"Y"},
+  {no:66,  name:"구로오류동(도양라비앙) 902", addr:"서울특별시 구로구 경인로 230-14(오류동)",       gu:"구로구",   lat:37.4994, lng:126.8442, area:40.13, rooms:2, floor:"9층",  elev:"Y"},
+  {no:67,  name:"구로오류동(도양라비앙) 1103",addr:"서울특별시 구로구 경인로 230-14(오류동)",       gu:"구로구",   lat:37.4995, lng:126.8444, area:39.19, rooms:2, floor:"11층", elev:"Y"},
+  {no:260, name:"서초양재동(서원빌)",         addr:"서울특별시 서초구 강남대로10길 79(양재동)",     gu:"서초구",   lat:37.4784, lng:127.0469, area:38.96, rooms:1, floor:"3층",  elev:"Y"},
+  {no:290, name:"양천신정동(신성스카이뷰)",   addr:"서울특별시 양천구 오목로24길 29(신정동)",       gu:"양천구",   lat:37.5255, lng:126.8739, area:38.86, rooms:2, floor:"2층",  elev:"Y"},
+  {no:34,  name:"강서화곡동(라움리츠빌)",     addr:"서울특별시 강서구 가로공원로77길 9(화곡동)",    gu:"강서구",   lat:37.5378, lng:126.8513, area:38.12, rooms:1, floor:"4층",  elev:"Y"},
+  {no:32,  name:"강서방화동(펜타곤스카이)",   addr:"서울특별시 강서구 개화동로31길 24(방화동)",     gu:"강서구",   lat:37.5681, lng:126.8039, area:36.17, rooms:2, floor:"8층",  elev:"Y"},
+  {no:169, name:"동대문장안동(제일빌라)",     addr:"서울특별시 동대문구 장한로32길 23-4(장안동)",   gu:"동대문구", lat:37.5680, lng:127.0722, area:35.82, rooms:1, floor:"3층",  elev:"Y"},
+  {no:177, name:"마포공덕동(에이크로아이트)", addr:"서울특별시 마포구 만리재로 125(공덕동)",        gu:"마포구",   lat:37.5434, lng:126.9519, area:35.29, rooms:2, floor:"11층", elev:"Y"},
+  {no:7,   name:"강동길동(거산유팰리스2차)",  addr:"서울특별시 강동구 천호대로177길 39(길동)",      gu:"강동구",   lat:37.5393, lng:127.1317, area:34.32, rooms:1, floor:"13층", elev:"Y"},
+  {no:332, name:"은평역촌동(서경) 301",       addr:"서울특별시 은평구 연서로16길 3-7(역촌동)",      gu:"은평구",   lat:37.6100, lng:126.9199, area:33.00, rooms:3, floor:"3층",  elev:"Y"},
+  {no:272, name:"송파삼전동(삼전파크빌)",     addr:"서울특별시 송파구 삼전로4길 3-13(삼전동)",      gu:"송파구",   lat:37.5044, lng:127.0974, area:31.82, rooms:1, floor:"2층",  elev:"Y"},
+];
+
+const palette = ["#185FA5","#0F6E56","#993C1D","#534AB7","#854F0B","#993556","#3B6D11","#A32D2D","#5F5E5A","#BA7517"];
+const guList = [...new Set(houses.map(h => h.gu))];
+const guColors = {};
+guList.forEach((g, i) => guColors[g] = palette[i % palette.length]);
+
+const map = L.map('map').setView([37.5665, 126.9780], 11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
+  maxZoom: 19
+}).addTo(map);
+
+function makeIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.25)"></div>`,
+    iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -16]
+  });
+}
+
+let markers = [];
+
+function renderMarkers(gu) {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+  const filtered = gu === "전체" ? houses : houses.filter(h => h.gu === gu);
+  document.getElementById('count').textContent = filtered.length + '개 표시 중';
+  filtered.forEach(h => {
+    const elevClass = h.elev === "Y" ? "elev-y" : "elev-n";
+    const elevText  = h.elev === "Y" ? "승강기 있음" : "승강기 없음";
+    const m = L.marker([h.lat, h.lng], { icon: makeIcon(guColors[h.gu]) })
+      .addTo(map)
+      .bindPopup(`
+        <div class="popup-box">
+          <div class="popup-no">#${h.no}</div>
+          <div class="popup-name">${h.name}</div>
+          <div class="popup-addr">${h.addr}</div>
+          <hr class="popup-divider">
+          <div class="popup-tags">
+            <span class="popup-tag">전용 ${h.area}㎡</span>
+            <span class="popup-tag">방 ${h.rooms}개</span>
+            <span class="popup-tag">${h.floor}</span>
+            <span class="popup-tag ${elevClass}">${elevText}</span>
+          </div>
+        </div>
+      `, { maxWidth: 280 });
+    markers.push(m);
+  });
+}
+
+const filterEl = document.getElementById('gu-filter');
+["전체", ...guList].forEach(g => {
+  const c = document.createElement('span');
+  c.className = 'chip' + (g === "전체" ? ' on' : '');
+  if (g !== "전체") {
+    const dot = document.createElement('span');
+    dot.style.cssText = `display:inline-block;width:8px;height:8px;border-radius:50%;background:${guColors[g]};margin-right:5px;vertical-align:middle`;
+    c.appendChild(dot);
+  }
+  c.appendChild(document.createTextNode(g));
+  c.onclick = () => {
+    document.querySelectorAll('.chip').forEach(x => x.classList.remove('on'));
+    c.classList.add('on');
+    renderMarkers(g);
+  };
+  filterEl.appendChild(c);
+});
+
+renderMarkers("전체");
+</script>
+</body>
+</html>
