@@ -3,136 +3,317 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LH 청년 매입임대 지도</title>
+<title>LH 청년 매입임대 — 맞춤 점수 지도</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Apple SD Gothic Neo', sans-serif; background: #f8f8f7; }
-#header { padding: 14px 20px; background: #fff; border-bottom: 1px solid #e8e8e6; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-#header h1 { font-size: 16px; font-weight: 600; color: #1a1a1a; }
-#count { font-size: 13px; color: #888; }
-#gu-filter { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 20px; background: #fff; border-bottom: 1px solid #e8e8e6; }
-.chip { font-size: 12px; padding: 4px 12px; border-radius: 99px; border: 1px solid #ddd; color: #555; background: #fff; cursor: pointer; transition: all 0.15s; }
-.chip:hover { border-color: #185FA5; color: #185FA5; }
-.chip.on { background: #E6F1FB; color: #0C447C; border-color: #85B7EB; font-weight: 500; }
-#map { width: 100%; height: calc(100vh - 105px); }
-.popup-box { font-family: 'Apple SD Gothic Neo', sans-serif; min-width: 210px; }
-.popup-no { font-size: 11px; color: #185FA5; font-weight: 600; margin-bottom: 3px; }
-.popup-name { font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
-.popup-addr { font-size: 12px; color: #666; line-height: 1.5; margin-bottom: 8px; }
-.popup-divider { border: none; border-top: 1px solid #eee; margin: 6px 0; }
-.popup-tags { display: flex; flex-wrap: wrap; gap: 5px; }
-.popup-tag { font-size: 11px; padding: 3px 8px; border-radius: 99px; background: #f0f0ef; color: #444; }
-.popup-tag.elev-y { background: #E1F5EE; color: #085041; }
-.popup-tag.elev-n { background: #FCEBEB; color: #791F1F; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Apple SD Gothic Neo',sans-serif;background:#f5f5f3;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* 헤더 */
+#header{background:#fff;border-bottom:1px solid #e5e5e3;padding:12px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+#header h1{font-size:15px;font-weight:600;color:#1a1a1a}
+#total-count{font-size:12px;color:#999;margin-left:auto}
+
+/* 탭 */
+#tabs{display:flex;background:#fff;border-bottom:1px solid #e5e5e3;flex-shrink:0}
+.tab{flex:1;padding:10px;font-size:13px;font-weight:500;color:#888;text-align:center;cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s}
+.tab.on{color:#185FA5;border-bottom-color:#185FA5}
+
+/* 패널 공통 */
+.panel{flex:1;overflow:hidden;display:none;flex-direction:column}
+.panel.on{display:flex}
+
+/* 사이드바 + 지도 레이아웃 */
+#map-panel{flex-direction:row}
+#sidebar{width:300px;flex-shrink:0;overflow-y:auto;background:#fff;border-right:1px solid #e5e5e3;display:flex;flex-direction:column}
+#map-wrap{flex:1}
+#map{width:100%;height:100%}
+
+/* 가중치 슬라이더 영역 */
+#weights{padding:14px 16px;border-bottom:1px solid #f0f0ee}
+#weights h2{font-size:12px;font-weight:600;color:#999;letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px}
+.w-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.w-label{font-size:12px;color:#444;width:68px;flex-shrink:0}
+.w-row input[type=range]{flex:1;accent-color:#185FA5;height:3px;cursor:pointer}
+.w-val{font-size:12px;font-weight:600;color:#185FA5;width:28px;text-align:right}
+#weight-sum{font-size:11px;color:#999;margin-top:4px;text-align:right}
+#weight-sum.over{color:#E24B4A}
+
+/* 지도 핀 리스트 */
+#pin-list{overflow-y:auto;flex:1}
+.pin-item{padding:10px 14px;border-bottom:1px solid #f0f0ee;cursor:pointer;transition:background 0.1s}
+.pin-item:hover{background:#f8f8f7}
+.pin-item.active{background:#EBF4FD}
+.pin-rank{font-size:11px;font-weight:700;color:#fff;background:#185FA5;border-radius:4px;padding:1px 5px;margin-right:6px}
+.pin-name{font-size:13px;font-weight:500;color:#1a1a1a}
+.pin-score{font-size:12px;font-weight:700;margin-top:3px}
+.pin-meta{font-size:11px;color:#999;margin-top:2px}
+
+/* 랭킹 패널 */
+#rank-panel{overflow-y:auto;padding:16px}
+#rank-panel h2{font-size:13px;font-weight:600;color:#555;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e5e3}
+th{background:#f8f8f7;color:#666;font-weight:600;padding:8px 10px;text-align:left;border-bottom:1px solid #e5e5e3;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid #f5f5f3;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#f8fbff}
+.rank-no{font-weight:700;color:#185FA5;font-size:13px}
+.score-bar-wrap{display:flex;align-items:center;gap:6px}
+.score-bar{height:6px;border-radius:3px;background:#185FA5;min-width:4px;transition:width 0.3s}
+.score-text{font-weight:700;font-size:12px;white-space:nowrap}
+.tag{font-size:10px;padding:2px 6px;border-radius:99px;background:#f0f0ef;color:#555}
+.tag.elev-y{background:#E1F5EE;color:#085041}
+.tag.elev-n{background:#FCEBEB;color:#791F1F}
+
+/* 팝업 */
+.popup-box{font-family:'Apple SD Gothic Neo',sans-serif;min-width:220px}
+.popup-score{font-size:20px;font-weight:700;margin-bottom:4px}
+.popup-name{font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:3px}
+.popup-addr{font-size:11px;color:#888;margin-bottom:8px;line-height:1.5}
+.popup-divider{border:none;border-top:1px solid #eee;margin:6px 0}
+.popup-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.popup-item{font-size:11px;background:#f5f5f3;border-radius:4px;padding:4px 7px}
+.popup-item span{display:block;color:#999;font-size:10px;margin-bottom:1px}
+.popup-bars{margin-top:8px}
+.pbar-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.pbar-label{font-size:10px;color:#888;width:55px;flex-shrink:0}
+.pbar-track{flex:1;height:5px;background:#eee;border-radius:3px;overflow:hidden}
+.pbar-fill{height:100%;border-radius:3px;background:#185FA5;transition:width 0.3s}
+.pbar-val{font-size:10px;color:#185FA5;font-weight:600;width:24px;text-align:right}
 </style>
 </head>
 <body>
 
 <div id="header">
-  <h1>LH 청년 매입임대주택</h1>
-  <span id="count">25개 표시 중</span>
+  <h1>LH 청년 매입임대 — 맞춤 점수</h1>
+  <span id="total-count">24개 매물</span>
 </div>
-<div id="gu-filter"></div>
-<div id="map"></div>
+
+<div id="tabs">
+  <div class="tab on" data-tab="map-panel">지도</div>
+  <div class="tab" data-tab="rank-panel">랭킹</div>
+</div>
+
+<div id="map-panel" class="panel on">
+  <div id="sidebar">
+    <div id="weights">
+      <h2>가중치 설정</h2>
+      <div class="w-row"><span class="w-label">면적</span><input type="range" id="w-area" min="0" max="40" value="20" step="5"><span class="w-val" id="wv-area">20</span></div>
+      <div class="w-row"><span class="w-label">방수</span><input type="range" id="w-rooms" min="0" max="40" value="15" step="5"><span class="w-val" id="wv-rooms">15</span></div>
+      <div class="w-row"><span class="w-label">역세권</span><input type="range" id="w-station" min="0" max="50" value="30" step="5"><span class="w-val" id="wv-station">30</span></div>
+      <div class="w-row"><span class="w-label">생활반경</span><input type="range" id="w-life" min="0" max="50" value="35" step="5"><span class="w-val" id="wv-life">35</span></div>
+      <div id="weight-sum">합계: 100%</div>
+    </div>
+    <div id="pin-list"></div>
+  </div>
+  <div id="map-wrap"><div id="map"></div></div>
+</div>
+
+<div id="rank-panel" class="panel">
+  <div style="padding:14px 16px;background:#fff;border-bottom:1px solid #e5e5e3;flex-shrink:0">
+    <div style="font-size:12px;color:#888">가중치를 조정하면 순위가 실시간으로 바뀝니다</div>
+  </div>
+  <div id="rank-table-wrap" style="overflow-y:auto;padding:16px"></div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const houses = [
-  {no:59,  name:"구로개봉동(오성드림빌)",     addr:"서울특별시 구로구 경인로35길 16-8(개봉동)",      gu:"구로구",   lat:37.4913, lng:126.8547, area:58.84, rooms:3, floor:"3층",  elev:"N"},
-  {no:269, name:"성북장위동(시온아트빌)",     addr:"서울특별시 성북구 장위로15길 55-2(장위동)",     gu:"성북구",   lat:37.6127, lng:127.0528, area:50.08, rooms:2, floor:"4층",  elev:"Y"},
-  {no:27,  name:"강북수유동(성우울타리)",     addr:"서울특별시 강북구 노해로33길 60-9(수유동)",     gu:"강북구",   lat:37.6467, lng:127.0213, area:49.04, rooms:2, floor:"4층",  elev:"Y"},
-  {no:333, name:"은평역촌동(서경) 601",       addr:"서울특별시 은평구 연서로16길 3-7(역촌동)",      gu:"은평구",   lat:37.6098, lng:126.9196, area:47.99, rooms:3, floor:"6층",  elev:"Y"},
-  {no:25,  name:"강북번동(리치하우스)",       addr:"서울특별시 강북구 덕릉로40길 55(번동)",         gu:"강북구",   lat:37.6365, lng:127.0341, area:47.42, rooms:3, floor:"3층",  elev:"Y"},
-  {no:16,  name:"강동성내동(주함해븐빌)",     addr:"서울특별시 강동구 양재대로97길 17(성내동)",     gu:"강동구",   lat:37.5384, lng:127.1243, area:45.99, rooms:3, floor:"4층",  elev:"Y"},
-  {no:268, name:"성북장위동(시온아트빌) 201", addr:"서울특별시 성북구 장위로15길 55-2(장위동)",     gu:"성북구",   lat:37.6130, lng:127.0531, area:43.77, rooms:3, floor:"2층",  elev:"Y"},
-  {no:175, name:"동작상도동",                 addr:"서울특별시 동작구 성대로17길 3(상도동)",        gu:"동작구",   lat:37.4968, lng:126.9474, area:42.81, rooms:1, floor:"4층",  elev:"N"},
-  {no:57,  name:"구로개봉동(오성드림) A-202", addr:"서울특별시 구로구 개봉로1길 106(개봉동)",       gu:"구로구",   lat:37.4931, lng:126.8573, area:41.49, rooms:2, floor:"2층",  elev:"Y"},
-  {no:58,  name:"구로개봉동(오성드림) A-302", addr:"서울특별시 구로구 개봉로1길 106(개봉동)",       gu:"구로구",   lat:37.4934, lng:126.8576, area:41.49, rooms:2, floor:"3층",  elev:"Y"},
-  {no:76,  name:"노원상계동(해밀)",           addr:"서울특별시 노원구 동일로237나길 17(상계동)",    gu:"노원구",   lat:37.6577, lng:127.0641, area:40.56, rooms:1, floor:"3층",  elev:"Y"},
-  {no:63,  name:"구로오류동(도양라비앙) 401", addr:"서울특별시 구로구 경인로 230-14(오류동)",       gu:"구로구",   lat:37.4992, lng:126.8438, area:40.13, rooms:2, floor:"4층",  elev:"Y"},
-  {no:65,  name:"구로오류동(도양라비앙) 701", addr:"서울특별시 구로구 경인로 230-14(오류동)",       gu:"구로구",   lat:37.4993, lng:126.8440, area:40.13, rooms:2, floor:"7층",  elev:"Y"},
-  {no:66,  name:"구로오류동(도양라비앙) 902", addr:"서울특별시 구로구 경인로 230-14(오류동)",       gu:"구로구",   lat:37.4994, lng:126.8442, area:40.13, rooms:2, floor:"9층",  elev:"Y"},
-  {no:67,  name:"구로오류동(도양라비앙) 1103",addr:"서울특별시 구로구 경인로 230-14(오류동)",       gu:"구로구",   lat:37.4995, lng:126.8444, area:39.19, rooms:2, floor:"11층", elev:"Y"},
-  {no:260, name:"서초양재동(서원빌)",         addr:"서울특별시 서초구 강남대로10길 79(양재동)",     gu:"서초구",   lat:37.4784, lng:127.0469, area:38.96, rooms:1, floor:"3층",  elev:"Y"},
-  {no:290, name:"양천신정동(신성스카이뷰)",   addr:"서울특별시 양천구 오목로24길 29(신정동)",       gu:"양천구",   lat:37.5255, lng:126.8739, area:38.86, rooms:2, floor:"2층",  elev:"Y"},
-  {no:34,  name:"강서화곡동(라움리츠빌)",     addr:"서울특별시 강서구 가로공원로77길 9(화곡동)",    gu:"강서구",   lat:37.5378, lng:126.8513, area:38.12, rooms:1, floor:"4층",  elev:"Y"},
-  {no:32,  name:"강서방화동(펜타곤스카이)",   addr:"서울특별시 강서구 개화동로31길 24(방화동)",     gu:"강서구",   lat:37.5681, lng:126.8039, area:36.17, rooms:2, floor:"8층",  elev:"Y"},
-  {no:169, name:"동대문장안동(제일빌라)",     addr:"서울특별시 동대문구 장한로32길 23-4(장안동)",   gu:"동대문구", lat:37.5680, lng:127.0722, area:35.82, rooms:1, floor:"3층",  elev:"Y"},
-  {no:177, name:"마포공덕동(에이크로아이트)", addr:"서울특별시 마포구 만리재로 125(공덕동)",        gu:"마포구",   lat:37.5434, lng:126.9519, area:35.29, rooms:2, floor:"11층", elev:"Y"},
-  {no:7,   name:"강동길동(거산유팰리스2차)",  addr:"서울특별시 강동구 천호대로177길 39(길동)",      gu:"강동구",   lat:37.5393, lng:127.1317, area:34.32, rooms:1, floor:"13층", elev:"Y"},
-  {no:332, name:"은평역촌동(서경) 301",       addr:"서울특별시 은평구 연서로16길 3-7(역촌동)",      gu:"은평구",   lat:37.6100, lng:126.9199, area:33.00, rooms:3, floor:"3층",  elev:"Y"},
-  {no:272, name:"송파삼전동(삼전파크빌)",     addr:"서울특별시 송파구 삼전로4길 3-13(삼전동)",      gu:"송파구",   lat:37.5044, lng:127.0974, area:31.82, rooms:1, floor:"2층",  elev:"Y"},
+  {no:59,  name:"구로개봉동(오성드림빌)",     addr:"구로구 경인로35길 16-8(개봉동)",      gu:"구로구",   lat:37.4913,lng:126.8547,area:58.84,rooms:3,floor:"3층", elev:"N",station:"개봉",  stDist:0.353,dAirport:34.21,dSongpa:24.73,dGangdong:28.19},
+  {no:269, name:"성북장위동(시온아트빌)",     addr:"성북구 장위로15길 55-2(장위동)",     gu:"성북구",   lat:37.6127,lng:127.0528,area:50.08,rooms:2,floor:"4층", elev:"Y",station:"장위",  stDist:0.417,dAirport:47.51,dSongpa:13.77,dGangdong:14.75},
+  {no:27,  name:"강북수유동(성우울타리)",     addr:"강북구 노해로33길 60-9(수유동)",     gu:"강북구",   lat:37.6467,lng:127.0213,area:49.04,rooms:2,floor:"4층", elev:"Y",station:"수유",  stDist:1.050,dAirport:50.14,dSongpa:17.81,dGangdong:18.37},
+  {no:333, name:"은평역촌동(서경) 601",       addr:"은평구 연서로16길 3-7(역촌동)",      gu:"은평구",   lat:37.6098,lng:126.9196,area:47.99,rooms:3,floor:"6층", elev:"Y",station:"역촌",  stDist:0.180,dAirport:41.35,dSongpa:22.37,dGangdong:25.16},
+  {no:25,  name:"강북번동(리치하우스)",       addr:"강북구 덕릉로40길 55(번동)",         gu:"강북구",   lat:37.6365,lng:127.0341,area:47.42,rooms:3,floor:"3층", elev:"Y",station:"번동",  stDist:0.366,dAirport:48.41,dSongpa:16.67,dGangdong:17.27},
+  {no:16,  name:"강동성내동(주함해븐빌)",     addr:"강동구 양재대로97길 17(성내동)",     gu:"강동구",   lat:37.5384,lng:127.1243,area:45.99,rooms:3,floor:"4층", elev:"Y",station:"성내",  stDist:0.313,dAirport:60.93,dSongpa:3.11, dGangdong:2.29},
+  {no:268, name:"성북장위동(시온아트빌) 201", addr:"성북구 장위로15길 55-2(장위동)",     gu:"성북구",   lat:37.6130,lng:127.0531,area:43.77,rooms:3,floor:"2층", elev:"Y",station:"장위",  stDist:0.385,dAirport:47.53,dSongpa:13.81,dGangdong:14.78},
+  {no:175, name:"동작상도동",                 addr:"동작구 성대로17길 3(상도동)",        gu:"동작구",   lat:37.4968,lng:126.9474,area:42.81,rooms:1,floor:"4층", elev:"N",station:"상도",  stDist:0.533,dAirport:44.21,dSongpa:16.88,dGangdong:22.03},
+  {no:57,  name:"구로개봉동(오성드림) A-202", addr:"구로구 개봉로1길 106(개봉동)",       gu:"구로구",   lat:37.4931,lng:126.8573,area:41.49,rooms:2,floor:"2층", elev:"Y",station:"개봉",  stDist:0.054,dAirport:34.47,dSongpa:24.38,dGangdong:27.82},
+  {no:58,  name:"구로개봉동(오성드림) A-302", addr:"구로구 개봉로1길 106(개봉동)",       gu:"구로구",   lat:37.4934,lng:126.8576,area:41.49,rooms:2,floor:"3층", elev:"Y",station:"개봉",  stDist:0.035,dAirport:34.49,dSongpa:24.36,dGangdong:27.80},
+  {no:76,  name:"노원상계동(해밀)",           addr:"노원구 동일로237나길 17(상계동)",    gu:"노원구",   lat:37.6577,lng:127.0641,area:40.56,rooms:1,floor:"3층", elev:"Y",station:"상계",  stDist:0.287,dAirport:51.86,dSongpa:19.72,dGangdong:18.90},
+  {no:63,  name:"구로오류동(도양라비앙) 401", addr:"구로구 경인로 230-14(오류동)",       gu:"구로구",   lat:37.4992,lng:126.8438,area:40.13,rooms:2,floor:"4층", elev:"Y",station:"오류동", stDist:0.102,dAirport:36.60,dSongpa:25.37,dGangdong:28.96},
+  {no:65,  name:"구로오류동(도양라비앙) 701", addr:"구로구 경인로 230-14(오류동)",       gu:"구로구",   lat:37.4993,lng:126.8440,area:40.13,rooms:2,floor:"7층", elev:"Y",station:"오류동", stDist:0.117,dAirport:36.60,dSongpa:25.37,dGangdong:28.95},
+  {no:66,  name:"구로오류동(도양라비앙) 902", addr:"구로구 경인로 230-14(오류동)",       gu:"구로구",   lat:37.4994,lng:126.8442,area:40.13,rooms:2,floor:"9층", elev:"Y",station:"오류동", stDist:0.133,dAirport:36.60,dSongpa:25.36,dGangdong:28.94},
+  {no:67,  name:"구로오류동(도양라비앙) 1103",addr:"구로구 경인로 230-14(오류동)",       gu:"구로구",   lat:37.4995,lng:126.8444,area:39.19,rooms:2,floor:"11층",elev:"Y",station:"오류동", stDist:0.151,dAirport:36.60,dSongpa:25.36,dGangdong:28.94},
+  {no:260, name:"서초양재동(서원빌)",         addr:"서초구 강남대로10길 79(양재동)",     gu:"서초구",   lat:37.4784,lng:127.0469,area:38.96,rooms:1,floor:"3층", elev:"Y",station:"양재",  stDist:1.302,dAirport:53.54,dSongpa:6.57, dGangdong:11.80},
+  {no:290, name:"양천신정동(신성스카이뷰)",   addr:"양천구 오목로24길 29(신정동)",       gu:"양천구",   lat:37.5255,lng:126.8739,area:38.86,rooms:2,floor:"2층", elev:"Y",station:"신정",  stDist:0.216,dAirport:38.75,dSongpa:22.17,dGangdong:27.56},
+  {no:34,  name:"강서화곡동(라움리츠빌)",     addr:"강서구 가로공원로77길 9(화곡동)",    gu:"강서구",   lat:37.5378,lng:126.8513,area:38.12,rooms:1,floor:"4층", elev:"Y",station:"화곡",  stDist:0.424,dAirport:38.33,dSongpa:21.75,dGangdong:27.30},
+  {no:32,  name:"강서방화동(펜타곤스카이)",   addr:"강서구 개화동로31길 24(방화동)",     gu:"강서구",   lat:37.5681,lng:126.8039,area:36.17,rooms:2,floor:"8층", elev:"Y",station:"방화",  stDist:0.452,dAirport:34.56,dSongpa:24.73,dGangdong:29.94},
+  {no:169, name:"동대문장안동(제일빌라)",     addr:"동대문구 장한로32길 23-4(장안동)",   gu:"동대문구", lat:37.5680,lng:127.0722,area:35.82,rooms:1,floor:"3층", elev:"Y",station:"장안",  stDist:0.387,dAirport:56.97,dSongpa:6.65, dGangdong:6.86},
+  {no:177, name:"마포공덕동(에이크로아이트)", addr:"마포구 만리재로 125(공덕동)",        gu:"마포구",   lat:37.5434,lng:126.9519,area:35.29,rooms:2,floor:"11층",elev:"Y",station:"공덕",  stDist:0.114,dAirport:44.52,dSongpa:17.38,dGangdong:22.77},
+  {no:7,   name:"강동길동(거산유팰리스2차)",  addr:"강동구 천호대로177길 39(길동)",      gu:"강동구",   lat:37.5393,lng:127.1317,area:34.32,rooms:1,floor:"13층",elev:"Y",station:"길동",  stDist:0.000,dAirport:61.59,dSongpa:3.58, dGangdong:1.71},
+  {no:332, name:"은평역촌동(서경) 301",       addr:"은평구 연서로16길 3-7(역촌동)",      gu:"은평구",   lat:37.6100,lng:126.9199,area:33.00,rooms:3,floor:"3층", elev:"Y",station:"역촌",  stDist:0.145,dAirport:41.36,dSongpa:22.40,dGangdong:25.18},
+  {no:272, name:"송파삼전동(삼전파크빌)",     addr:"송파구 삼전로4길 3-13(삼전동)",      gu:"송파구",   lat:37.5044,lng:127.0974,area:31.82,rooms:1,floor:"2층", elev:"Y",station:"삼전",  stDist:0.000,dAirport:58.15,dSongpa:1.35, dGangdong:6.60},
 ];
 
-const palette = ["#185FA5","#0F6E56","#993C1D","#534AB7","#854F0B","#993556","#3B6D11","#A32D2D","#5F5E5A","#BA7517"];
-const guList = [...new Set(houses.map(h => h.gu))];
-const guColors = {};
-guList.forEach((g, i) => guColors[g] = palette[i % palette.length]);
+// 정규화 헬퍼
+function normalize(val, min, max, invert=false) {
+  if (max === min) return 5;
+  const n = (val - min) / (max - min) * 10;
+  return invert ? 10 - n : n;
+}
 
-const map = L.map('map').setView([37.5665, 126.9780], 11);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
-  maxZoom: 19
-}).addTo(map);
+const areaMin  = Math.min(...houses.map(h=>h.area)),  areaMax  = Math.max(...houses.map(h=>h.area));
+const stMin    = Math.min(...houses.map(h=>h.stDist)), stMax    = Math.max(...houses.map(h=>h.stDist));
+const lifeVals = houses.map(h=>(h.dAirport+h.dSongpa+h.dGangdong)/3);
+const lifeMin  = Math.min(...lifeVals), lifeMax = Math.max(...lifeVals);
 
-function makeIcon(color) {
+function calcScores(wArea, wRooms, wStation, wLife) {
+  const total = wArea + wRooms + wStation + wLife || 1;
+  return houses.map((h,i) => {
+    const sArea    = normalize(h.area, areaMin, areaMax) * (wArea/total);
+    const sRooms   = (h.rooms===1?0:h.rooms===2?5:10) * (wRooms/total);
+    const sStation = normalize(h.stDist, stMin, stMax, true) * (wStation/total);
+    const sLife    = normalize(lifeVals[i], lifeMin, lifeMax, true) * (wLife/total);
+    const score    = Math.round((sArea+sRooms+sStation+sLife)*10)/10;
+    return {...h, score, sArea:+sArea.toFixed(1), sRooms:+sRooms.toFixed(1), sStation:+sStation.toFixed(1), sLife:+sLife.toFixed(1), lifeAvg:+lifeVals[i].toFixed(1)};
+  }).sort((a,b)=>b.score-a.score);
+}
+
+function scoreColor(score) {
+  const t = score/10;
+  const r = Math.round(30  + (226-30)*  (1-t));
+  const g = Math.round(95  + (158-95)*  t);
+  const b = Math.round(200 + (30 -200)* t);
+  return `rgb(${r},${g},${b})`;
+}
+
+// 가중치
+let W = {area:20, rooms:15, station:30, life:35};
+let scored = calcScores(W.area, W.rooms, W.station, W.life);
+
+// 지도
+const map = L.map('map').setView([37.555, 126.98], 11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
+
+let markers = {}, activeNo = null;
+
+function makeIcon(score, rank) {
+  const c = scoreColor(score);
   return L.divIcon({
-    className: '',
-    html: `<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.25)"></div>`,
-    iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -16]
+    className:'',
+    html:`<div style="position:relative;width:32px;height:32px">
+      <div style="width:32px;height:32px;border-radius:50%;background:${c};border:2.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff">${rank}</div>
+    </div>`,
+    iconSize:[32,32],iconAnchor:[16,16],popupAnchor:[0,-20]
   });
 }
 
-let markers = [];
+function buildPopup(h, rank) {
+  const c = scoreColor(h.score);
+  return `<div class="popup-box">
+    <div class="popup-score" style="color:${c}">${h.score.toFixed(1)}점 <span style="font-size:12px;color:#999;font-weight:400">(${rank}위)</span></div>
+    <div class="popup-name">#${h.no} ${h.name}</div>
+    <div class="popup-addr">${h.addr}</div>
+    <hr class="popup-divider">
+    <div class="popup-grid">
+      <div class="popup-item"><span>전용면적</span>${h.area}㎡</div>
+      <div class="popup-item"><span>방수</span>${h.rooms}개</div>
+      <div class="popup-item"><span>층수</span>${h.floor}</div>
+      <div class="popup-item"><span>승강기</span>${h.elev==='Y'?'있음':'없음'}</div>
+      <div class="popup-item"><span>가까운 역</span>${h.station}역 ${(h.stDist*1000).toFixed(0)}m</div>
+      <div class="popup-item"><span>생활반경 평균</span>${h.lifeAvg}km</div>
+    </div>
+    <div class="popup-bars">
+      <div class="pbar-row"><span class="pbar-label">면적점수</span><div class="pbar-track"><div class="pbar-fill" style="width:${h.sArea*10}%"></div></div><span class="pbar-val">${h.sArea}</span></div>
+      <div class="pbar-row"><span class="pbar-label">방수점수</span><div class="pbar-track"><div class="pbar-fill" style="width:${h.sRooms*10}%"></div></div><span class="pbar-val">${h.sRooms}</span></div>
+      <div class="pbar-row"><span class="pbar-label">역세권점수</span><div class="pbar-track"><div class="pbar-fill" style="width:${h.sStation*10}%"></div></div><span class="pbar-val">${h.sStation}</span></div>
+      <div class="pbar-row"><span class="pbar-label">생활반경점수</span><div class="pbar-track"><div class="pbar-fill" style="width:${h.sLife*10}%"></div></div><span class="pbar-val">${h.sLife}</span></div>
+    </div>
+  </div>`;
+}
 
-function renderMarkers(gu) {
-  markers.forEach(m => map.removeLayer(m));
-  markers = [];
-  const filtered = gu === "전체" ? houses : houses.filter(h => h.gu === gu);
-  document.getElementById('count').textContent = filtered.length + '개 표시 중';
-  filtered.forEach(h => {
-    const elevClass = h.elev === "Y" ? "elev-y" : "elev-n";
-    const elevText  = h.elev === "Y" ? "승강기 있음" : "승강기 없음";
-    const m = L.marker([h.lat, h.lng], { icon: makeIcon(guColors[h.gu]) })
+function renderMap(data) {
+  Object.values(markers).forEach(m=>map.removeLayer(m));
+  markers = {};
+  data.forEach((h,i) => {
+    const rank = i+1;
+    const m = L.marker([h.lat,h.lng],{icon:makeIcon(h.score,rank)})
       .addTo(map)
-      .bindPopup(`
-        <div class="popup-box">
-          <div class="popup-no">#${h.no}</div>
-          <div class="popup-name">${h.name}</div>
-          <div class="popup-addr">${h.addr}</div>
-          <hr class="popup-divider">
-          <div class="popup-tags">
-            <span class="popup-tag">전용 ${h.area}㎡</span>
-            <span class="popup-tag">방 ${h.rooms}개</span>
-            <span class="popup-tag">${h.floor}</span>
-            <span class="popup-tag ${elevClass}">${elevText}</span>
-          </div>
-        </div>
-      `, { maxWidth: 280 });
-    markers.push(m);
+      .bindPopup(buildPopup(h,rank),{maxWidth:300});
+    markers[h.no] = m;
   });
 }
 
-const filterEl = document.getElementById('gu-filter');
-["전체", ...guList].forEach(g => {
-  const c = document.createElement('span');
-  c.className = 'chip' + (g === "전체" ? ' on' : '');
-  if (g !== "전체") {
-    const dot = document.createElement('span');
-    dot.style.cssText = `display:inline-block;width:8px;height:8px;border-radius:50%;background:${guColors[g]};margin-right:5px;vertical-align:middle`;
-    c.appendChild(dot);
-  }
-  c.appendChild(document.createTextNode(g));
-  c.onclick = () => {
-    document.querySelectorAll('.chip').forEach(x => x.classList.remove('on'));
-    c.classList.add('on');
-    renderMarkers(g);
-  };
-  filterEl.appendChild(c);
+function renderList(data) {
+  const el = document.getElementById('pin-list');
+  el.innerHTML = data.map((h,i)=>{
+    const c = scoreColor(h.score);
+    return `<div class="pin-item" data-no="${h.no}" onclick="focusPin(${h.no})">
+      <div style="display:flex;align-items:center">
+        <span class="pin-rank" style="background:${c}">${i+1}</span>
+        <span class="pin-name">${h.name}</span>
+      </div>
+      <div class="pin-score" style="color:${c}">${h.score.toFixed(1)}점</div>
+      <div class="pin-meta">${h.area}㎡ · 방${h.rooms} · ${h.station}역 ${(h.stDist*1000).toFixed(0)}m · 생활반경 ${h.lifeAvg}km</div>
+    </div>`;
+  }).join('');
+}
+
+function renderRankTable(data) {
+  const wrap = document.getElementById('rank-table-wrap');
+  const rows = data.map((h,i)=>{
+    const c = scoreColor(h.score);
+    const barW = Math.round(h.score/10*100);
+    return `<tr>
+      <td><span class="rank-no">${i+1}</span></td>
+      <td style="font-weight:500;font-size:12px">#${h.no}<br><span style="color:#888;font-weight:400">${h.name}</span></td>
+      <td><div class="score-bar-wrap"><div class="score-bar" style="width:${barW}px;background:${c}"></div><span class="score-text" style="color:${c}">${h.score.toFixed(1)}</span></div></td>
+      <td>${h.area}㎡</td>
+      <td>${h.rooms}개</td>
+      <td>${h.station}역<br><span style="color:#999">${(h.stDist*1000).toFixed(0)}m</span></td>
+      <td>${h.lifeAvg}km</td>
+      <td>${h.floor}</td>
+      <td><span class="tag ${h.elev==='Y'?'elev-y':'elev-n'}">${h.elev==='Y'?'있음':'없음'}</span></td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `<table>
+    <thead><tr><th>순위</th><th>매물</th><th>점수</th><th>면적</th><th>방수</th><th>가까운역</th><th>생활반경</th><th>층수</th><th>승강기</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+window.focusPin = function(no) {
+  document.querySelectorAll('.pin-item').forEach(el=>el.classList.remove('active'));
+  const el = document.querySelector(`.pin-item[data-no="${no}"]`);
+  if(el) el.classList.add('active');
+  const m = markers[no];
+  if(m){ map.setView(m.getLatLng(),15); m.openPopup(); }
+};
+
+function refresh() {
+  scored = calcScores(W.area, W.rooms, W.station, W.life);
+  renderMap(scored);
+  renderList(scored);
+  renderRankTable(scored);
+}
+
+// 슬라이더
+['area','rooms','station','life'].forEach(key => {
+  const el = document.getElementById('w-'+key);
+  const vEl = document.getElementById('wv-'+key);
+  el.addEventListener('input', ()=>{
+    W[key] = +el.value;
+    vEl.textContent = W[key];
+    const sum = W.area+W.rooms+W.station+W.life;
+    const sumEl = document.getElementById('weight-sum');
+    sumEl.textContent = '합계: '+sum+'%';
+    sumEl.className = sum>100 ? 'over' : '';
+    refresh();
+  });
 });
 
-renderMarkers("전체");
+// 탭
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+    tab.classList.add('on');
+    document.getElementById(tab.dataset.tab).classList.add('on');
+    if(tab.dataset.tab==='map-panel') setTimeout(()=>map.invalidateSize(),50);
+  });
+});
+
+refresh();
 </script>
 </body>
 </html>
